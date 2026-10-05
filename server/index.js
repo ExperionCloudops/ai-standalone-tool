@@ -122,6 +122,9 @@ async function callAnthropicStreaming({ maxTokens, prompt, signal }) {
       model: MODEL,
       max_tokens: maxTokens,
       stream: true,
+      // Extended/adaptive thinking tokens count against max_tokens and were
+      // starving the JSON output, causing "cut off" truncations.
+      thinking: { type: "disabled" },
       messages: [{ role: "user", content: prompt }],
     }),
     signal,
@@ -156,6 +159,7 @@ async function callAnthropicStreaming({ maxTokens, prompt, signal }) {
       } catch (e) {
         continue;
       }
+      if (evt.type === "message_delta" && evt.usage) console.log("[gen] usage:", JSON.stringify(evt.usage));
       if (evt.type === "content_block_delta" && evt.delta && evt.delta.type === "text_delta") {
         text += evt.delta.text;
       } else if (evt.type === "message_delta" && evt.delta && evt.delta.stop_reason) {
@@ -280,7 +284,7 @@ app.post("/api/generate", async (req, res) => {
     try {
       // Bumped from 16000: a restructured multi-file folder layout needs more
       // room than the old single IaC + single pipeline snippet did.
-      ({ text: raw, stopReason } = await callAnthropicStreaming({ maxTokens: 28000, prompt, signal: upstreamController.signal }));
+      ({ text: raw, stopReason } = await callAnthropicStreaming({ maxTokens: 48000, prompt, signal: upstreamController.signal }));
     } catch (err) {
       if (err.name === "AbortError" || upstreamController.signal.aborted) {
         console.log("Generation aborted (client disconnected or clicked Stop).");
