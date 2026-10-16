@@ -1,8 +1,15 @@
 name: Deploy to Azure Container Apps
 
-# Requires three repository secrets (see scripts/setup-azure-oidc.sh for how
-# an Azure AD admin provisions the identity that provides them):
+# On every push to main (or a manual run): test the app, build the image, push it
+# to ACR tagged with the commit SHA, point the Container App at it, and fail the
+# run if the new revision doesn't become ready.
+#
+# Requires these repository secrets (see scripts/setup-azure-oidc.sh for how
+# an Azure AD admin provisions the identity behind the first three):
 #   AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID
+#   ADMIN_EMAILS  comma-separated sign-in emails of the app's admins
+#
+# ANTHROPIC_API_KEY stays as a Container App secret and is not touched here.
 on:
   push:
     branches: [main]
@@ -12,6 +19,11 @@ permissions:
   id-token: write # required for OIDC login to Azure
   contents: read
 
+# One deploy at a time; a second push waits instead of racing the first.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
 env:
   REGISTRY: experionaitoolacr.azurecr.io
   REGISTRY_NAME: experionaitoolacr
@@ -20,7 +32,29 @@ env:
   CONTAINER_APP_NAME: ai-pipeline-generator
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18 # matches the Dockerfile base image
+
+      - run: npm ci --omit=dev
+
+      - name: Smoke test the server
+        run: |
+          node --check server/index.js
+          AUTH_MODE=basic AUTH_USERNAME=ci AUTH_PASSWORD=ci PORT=8099 node server/index.js &
+          sleep 3
+          curl -fsS http://localhost:8099/api/health
+          echo
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8099/)
+          test "$code" = "401" || { echo "expected 401 without login, got $code"; exit 1; }
+
   build-and-deploy:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -44,11 +78,49 @@ jobs:
           docker push "$IMAGE:latest"
 
       - name: Deploy new image to Container App
+        id: deploy
+        env:
+          ADMIN_EMAILS: ${{ secrets.ADMIN_EMAILS }}
         run: |
-          az containerapp update \
+          # AUTH_MODE=entra: sign-in is handled by the app's built-in Microsoft Entra
+          # authentication. ADMIN_EMAILS is only changed when the variable is set.
+          ENV_VARS=("AUTH_MODE=entra")
+          if [ -n "$ADMIN_EMAILS" ]; then
+            ENV_VARS+=("ADMIN_EMAILS=$ADMIN_EMAILS")
+          else
+            echo "::warning::Repository secret ADMIN_EMAILS is not set - admin emails on the app are left unchanged."
+          fi
+
+          REVISION=$(az containerapp update \
             --name ${{ env.CONTAINER_APP_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
-            --image ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+            --image ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            --set-env-vars "${ENV_VARS[@]}" \
+            --query properties.latestRevisionName -o tsv)
+          echo "revision=$REVISION" >> "$GITHUB_OUTPUT"
+          echo "Created revision $REVISION"
+
+      - name: Wait for the new revision to become ready
+        run: |
+          REVISION="${{ steps.deploy.outputs.revision }}"
+          for i in $(seq 1 20); do
+            READY=$(az containerapp show \
+              --name ${{ env.CONTAINER_APP_NAME }} \
+              --resource-group ${{ env.RESOURCE_GROUP }} \
+              --query properties.latestReadyRevisionName -o tsv)
+            echo "[$i/20] latest ready revision: $READY (waiting for $REVISION)"
+            if [ "$READY" = "$REVISION" ]; then
+              echo "Revision $REVISION is ready."
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "::error::Revision $REVISION did not become ready within 5 minutes. Recent logs:"
+          az containerapp logs show \
+            --name ${{ env.CONTAINER_APP_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --revision "$REVISION" --tail 50 || true
+          exit 1
 
       - name: Azure logout
         if: always()

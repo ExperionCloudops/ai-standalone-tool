@@ -75,7 +75,7 @@ tool are small (a few cents per generation) but are real once deployed.
 
 ```bash
 cp .env.example .env
-# edit .env and paste in your ANTHROPIC_API_KEY
+# edit .env: paste in your ANTHROPIC_API_KEY and choose AUTH_USERNAME / AUTH_PASSWORD (the login for the tool)
 docker compose up --build
 ```
 
@@ -113,7 +113,7 @@ docker build -t ai-pipeline-generator:latest .
    docker tag ai-pipeline-generator:latest <ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/ai-pipeline-generator:latest
    docker push <ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/ai-pipeline-generator:latest
    ```
-2. Store `ANTHROPIC_API_KEY` in AWS Secrets Manager, not as a plain environment
+2. Store `AUTH_USERNAME`, `AUTH_PASSWORD` and `ANTHROPIC_API_KEY` in AWS Secrets Manager, not as a plain environment
    variable, and reference the secret from the task definition.
 3. Simplest path: **App Runner** — point it at the ECR image, map the secret,
    expose port 8080. No VPC/ALB setup needed for a quick internal pilot.
@@ -131,6 +131,10 @@ docker build -t ai-pipeline-generator:latest .
    ```
 2. Store `ANTHROPIC_API_KEY` in Azure Key Vault and reference it as a secret
    in the container app / app service configuration — not a plain app setting.
+   For sign-in, turn on the Container App's built-in authentication (Microsoft Entra ID, **Require
+   authentication**), set `AUTH_MODE=entra` and `ADMIN_EMAILS=<comma-separated admin emails>`, and in Entra
+   (Enterprise applications → Properties) set **Assignment required = Yes** and assign your users/group.
+   Users who aren't admins can generate but not use admin-only actions.
 3. Simplest path: **Azure Container Apps** — `az containerapp create` pointing
    at the ACR image, with the Key Vault secret mounted as an env var, port 8080.
 

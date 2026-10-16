@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root {
     /* Light theme by default — readable on its own, not gated behind OS preference. */
@@ -33,6 +34,11 @@
 
   .head { margin-bottom: 22px; }
   .head .eyebrow { font-family: var(--mono); font-size: 11.5px; color: var(--accent-text); margin-bottom: 8px; }
+  .user-bar { display: none; font-size: 12px; color: var(--muted); margin-bottom: 10px; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .user-bar.show { display: flex; }
+  .user-bar .role { font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); }
+  .user-bar .role.admin { background: var(--accent-dim); border-color: var(--accent); color: var(--accent-text); }
+  .user-bar a { color: var(--accent-text); }
   .head h1 { font-size: 26px; margin: 0 0 6px; letter-spacing: -0.01em; }
   .head p { color: var(--muted); font-size: 14px; margin: 0; max-width: 680px; }
 
@@ -168,6 +174,15 @@
 
   .explain-text { font-size: 14px; }
 
+  .und-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-top: 12px; }
+  .und-card { background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 8px; padding: 12px 14px; }
+  .und-card.warn { border-color: var(--warn); background: rgba(245,165,36,0.08); }
+  .und-card h5 { margin: 0 0 6px; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); }
+  .und-card ul { margin: 0; padding-left: 18px; font-size: 13px; }
+  .und-card li { margin-bottom: 4px; }
+  .und-card p { margin: 0; font-size: 13px; }
+  .und-none { color: var(--muted-2); font-size: 13px; }
+
   .issues-list { margin: 0; padding-left: 20px; font-size: 13.5px; }
   .issues-list li { margin-bottom: 6px; color: var(--danger-text); }
 
@@ -222,11 +237,80 @@
 
   ::-webkit-scrollbar { width: 8px; height: 8px; }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  /* --- Executive dashboard (shown after a review of existing code) --- */
+  #execDash { display: none; margin-bottom: 18px; flex-direction: column; gap: 16px; font-variant-numeric: tabular-nums; }
+  #execDash.show { display: flex; }
+  #execDash .card { background: var(--surface); border-radius: 8px; border: 1px solid var(--border-soft); box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+  #execDash .h { font-weight: 600; font-size: 15px; }
+  #execDash .muted { color: var(--muted); }
+  #execDash .small { font-size: 12px; }
+  #execDash .row { display: flex; flex-wrap: wrap; gap: 16px; }
+  #execDash .spread { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  #execDash .pill { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  #execDash .p-green { background: #DFF3E4; color: #0B5A2E; }
+  #execDash .p-amber { background: #FCEBCB; color: #7A4A00; }
+  #execDash .p-red { background: #FADBD7; color: #8A1C12; }
+  #execDash .p-crit { background: #C42B1C; color: #fff; }
+  #execDash .p-high { background: #FCE3CF; color: #7A3500; }
+  #execDash .p-med { background: #FFF4C4; color: #5C4A00; }
+  #execDash .p-low { background: #E4E8ED; color: #3B4552; }
+  #execDash .tool { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+  #execDash .tool-title { font-size: 20px; font-weight: 600; }
+  #execDash .export-btn { height: 38px; padding: 0 14px; border-radius: 6px; border: none; background: #1F6FB2; color: #fff; font-weight: 600; font-size: 13px; cursor: pointer; }
+  #execDash .export-btn:hover { background: #185C95; }
+  #execDash .export-btn.secondary { background: #fff; color: #1F6FB2; border: 1px solid #1F6FB2; }
+  #execDash .export-btn.secondary:hover { background: #EAF2FB; }
+  #execDash .gauge { position: relative; width: 190px; height: 190px; }
+  #execDash .gauge .c { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  #execDash .big { font-size: 52px; font-weight: 700; line-height: 1; }
+  #execDash .ragpill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 999px; font-weight: 700; font-size: 13px; letter-spacing: .04em; }
+  #execDash .mini { background: #F7F9FC; border-radius: 6px; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+  #execDash .decide { background: #0B1F33; color: #fff; border-radius: 8px; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+  #execDash .decide .item { background: #12304D; border-radius: 6px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
+  #execDash .grid-auto { display: grid; gap: 12px; }
+  #execDash .facts { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+  #execDash .fact { padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; }
+  #execDash .fact .v { font-size: 26px; font-weight: 700; line-height: 1.1; }
+  #execDash .areas { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+  #execDash .area { padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+  #execDash .area .s { font-size: 36px; font-weight: 700; line-height: 1; }
+  #execDash .area .ins { font-size: 13px; color: #3B4552; border-top: 1px solid var(--border-soft); padding-top: 8px; }
+  #execDash .xpanel { padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  #execDash .legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: #3B4552; }
+  #execDash .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  #execDash .sw { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+  #execDash .heatwrap { display: flex; gap: 8px; }
+  #execDash .heat { flex: 1; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+  #execDash .heat div { height: 44px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px; }
+  #execDash .barrow { display: grid; grid-template-columns: 150px minmax(0, 1fr) 30px; gap: 10px; align-items: center; }
+  #execDash .track { position: relative; height: 14px; background: #F1F4F8; border-radius: 3px; }
+  #execDash .track .f { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; }
+  #execDash .track .tgt { position: absolute; left: 80%; top: -3px; bottom: -3px; width: 2px; background: var(--text); }
+  #execDash table.issues { width: 100%; min-width: 640px; border-collapse: collapse; font-size: 13px; }
+  #execDash table.issues th { padding: 8px 10px; border-bottom: 2px solid var(--border-soft); font-weight: 600; text-align: left; color: var(--muted); font-size: 12px; }
+  #execDash table.issues td { padding: 12px 10px; border-bottom: 1px solid var(--border-soft); vertical-align: top; }
+  #execDash .prio { display: flex; gap: 12px; }
+  #execDash .prio .n { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; color: #fff; flex: none; }
+  #execDash .envgrid { min-width: 520px; display: grid; grid-template-columns: 110px repeat(5, minmax(0, 1fr)); gap: 4px; }
+  #execDash .envgrid div { display: flex; align-items: center; justify-content: center; height: 40px; border-radius: 4px; font-weight: 700; font-size: 13px; }
+  #execDash .envgrid .rh { justify-content: flex-start; padding: 0 10px; background: #F1F4F8; font-weight: 600; }
+  #execDash .envgrid .ch { font-size: 12px; color: var(--muted); font-weight: 400; height: auto; padding: 4px; }
+  #execDash .cov { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border-soft); font-size: 13px; }
+  @media print {
+    @page { size: A4 landscape; margin: 10mm; }
+    body { background: #fff; }
+    .wrap > *:not(#execDash) { display: none !important; }
+    #execDash { display: flex !important; }
+    #execDash .export-actions { display: none !important; }
+    #execDash .card, #execDash .decide { box-shadow: none; break-inside: avoid; }
+    .wrap { max-width: none; padding: 0; }
+  }
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="head">
+    <div class="user-bar" id="userBar"></div>
     <div class="eyebrow">devops.ai &middot; generator &middot; standalone</div>
     <h1>AI Pipeline &amp; Environment Generator</h1>
     <p>Describe a new environment/pipeline, paste or upload an existing one for review, or request a full solution bundle &mdash; for any cloud, IaC tool, and pipeline tool. Runs entirely from this server — nothing is sent anywhere except the AI API call.</p>
@@ -257,10 +341,12 @@
     </div>
 
     <div id="existingModeFields" style="display:none;">
-      <div class="field-label">Upload from your machine (optional) &mdash; a .zip of the repo/folder, or individual IaC/pipeline files</div>
+      <div class="field-label">Upload from your machine (optional) &mdash; a .zip, a whole folder, or individual IaC/pipeline files</div>
       <div class="upload-zone" id="uploadZone">
         <input type="file" id="fileUploadInput" multiple accept=".zip,.tf,.tfvars,.bicep,.bicepparam,.hcl,.json,.yml,.yaml" style="display:none;">
+        <input type="file" id="folderUploadInput" webkitdirectory multiple style="display:none;">
         <button type="button" class="upload-btn" id="uploadBtn">Choose .zip or files&hellip;</button>
+        <button type="button" class="upload-btn" id="folderBtn">Choose folder&hellip;</button>
         <span class="upload-zone-hint">or drag &amp; drop a .zip / files here</span>
       </div>
       <div class="uploaded-files" id="uploadedFilesList"></div>
@@ -277,7 +363,17 @@
     </div>
 
     <div id="solutionModeFields">
-      <div class="field-label">Describe the end-to-end solution you need</div>
+      <div class="field-label">Project document (optional) &mdash; a brief, SOW, requirements or architecture document (.pdf, .docx, .md, .txt)</div>
+      <div class="upload-zone" id="docZone">
+        <input type="file" id="docUploadInput" multiple accept=".pdf,.docx,.md,.markdown,.txt" style="display:none;">
+        <button type="button" class="upload-btn" id="docBtn">Choose document(s)&hellip;</button>
+        <span class="upload-zone-hint">or drag &amp; drop here &mdash; the AI reads it to work out scope and context, then designs the solution</span>
+      </div>
+      <div class="uploaded-files" id="docFilesList"></div>
+      <button type="button" class="upload-clear-btn" id="clearDocsBtn" style="display:none;">Remove documents</button>
+      <p class="field-hint">Text is extracted in your browser; only the extracted text is sent for the AI call. Redact secrets, credentials and personal data first. Scanned PDFs (images) can't be read.</p>
+
+      <div class="field-label">Describe the end-to-end solution you need &mdash; optional if you upload a document, otherwise required</div>
       <textarea id="solutionPromptInput" placeholder="e.g. Full onboarding setup for a new client: all environments with a managed Kubernetes cluster, managed database, secrets store and tenant object storage, plus the complete promotion pipeline with security gates"></textarea>
       <div class="field-label">Environments to include</div>
       <div class="env-checks" id="envChecks"></div>
@@ -299,6 +395,8 @@
     <div class="notice-box" id="noticeBox"></div>
   </div>
 
+  <div id="execDash"></div>
+
   <div class="panel results-panel" id="resultsPanel">
     <div class="results-header">
       <div class="results-title" id="resultsTitle">Results</div>
@@ -316,6 +414,11 @@
 
     <div class="results-section">
       <div class="impact-row" id="impactRow"></div>
+    </div>
+
+    <div class="results-section" id="understandingSection" style="display:none;">
+      <h4>Project understanding &mdash; check this matches your intent</h4>
+      <div id="understandingBox"></div>
     </div>
 
     <div class="results-section">
@@ -547,7 +650,7 @@ async function readZipFile(file) {
 }
 
 async function readPlainFile(file) {
-  const path = file.name;
+  const path = file.webkitRelativePath || file.name;
   if (shouldSkipUploadPath(path)) { skippedUploadFiles.push({ path, reason: "excluded (state/secret file)" }); return; }
   const ext = path.includes(".") ? path.toLowerCase().split(".").pop() : "";
   if (UPLOAD_BINARY_EXT.has(ext)) { skippedUploadFiles.push({ path, reason: "binary file" }); return; }
@@ -583,13 +686,22 @@ function renderUploadedFilesList() {
     ...uploadedPipelineFiles.map(f => ({ ...f, badge: "pipeline", label: "Pipeline" })),
     ...skippedUploadFiles.map(f => ({ ...f, badge: "skipped", label: "Skipped" })),
   ];
-  all.forEach(f => {
+  // A whole-folder upload can skip thousands of files; cap the skipped chips shown.
+  const MAX_SKIPPED_CHIPS = 30;
+  const shownAll = all.filter(f => f.badge !== "skipped").concat(all.filter(f => f.badge === "skipped").slice(0, MAX_SKIPPED_CHIPS));
+  shownAll.forEach(f => {
     const chip = document.createElement("div");
     chip.className = "uploaded-file-chip";
     chip.title = f.reason || "";
     chip.innerHTML = `<span class="badge ${f.badge}">${f.label}</span><span>${escapeHtml(f.path)}</span>`;
     el.appendChild(chip);
   });
+  if (skippedUploadFiles.length > MAX_SKIPPED_CHIPS) {
+    const more = document.createElement("div");
+    more.className = "uploaded-file-chip";
+    more.textContent = `+ ${skippedUploadFiles.length - MAX_SKIPPED_CHIPS} more skipped`;
+    el.appendChild(more);
+  }
   document.getElementById("clearUploadsBtn").style.display = all.length ? "inline-block" : "none";
 }
 
@@ -613,6 +725,7 @@ function clearUploadedFiles() {
   document.getElementById("existingIacInput").value = "";
   document.getElementById("existingPipelineInput").value = "";
   document.getElementById("fileUploadInput").value = "";
+  document.getElementById("folderUploadInput").value = "";
   renderUploadedFilesList();
 }
 
@@ -620,6 +733,12 @@ function initUploadZone() {
   const zone = document.getElementById("uploadZone");
   const input = document.getElementById("fileUploadInput");
   document.getElementById("uploadBtn").addEventListener("click", () => input.click());
+  const folderInput = document.getElementById("folderUploadInput");
+  document.getElementById("folderBtn").addEventListener("click", () => folderInput.click());
+  folderInput.addEventListener("change", async (e) => {
+    await handleUploadedFileList(e.target.files);
+    folderInput.value = "";
+  });
   input.addEventListener("change", async (e) => {
     await handleUploadedFileList(e.target.files);
     input.value = "";
@@ -635,6 +754,118 @@ function initUploadZone() {
     zone.classList.remove("dragover");
     await handleUploadedFileList(e.dataTransfer.files);
   });
+}
+
+// --- Project document upload ("Full solution bundle" mode) ---
+// PDF / Word / Markdown / text is turned into plain text in the browser; the
+// combined text is sent as `projectDocument` so the AI can work out scope and context.
+
+const DOC_MAX_TOTAL_CHARS = 250000;
+let projectDocs = []; // { name, text, status: "ok" | "truncated" | "failed", note }
+
+async function extractPdfText(file) {
+  if (typeof pdfjsLib === "undefined") throw new Error("PDF reader failed to load (check your internet connection)");
+  pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+  let text = "";
+  for (let p = 1; p <= pdf.numPages && text.length <= DOC_MAX_TOTAL_CHARS; p++) {
+    const content = await (await pdf.getPage(p)).getTextContent();
+    text += content.items.map(i => i.str + (i.hasEOL ? "\n" : " ")).join("") + "\n\n";
+  }
+  return text;
+}
+
+async function extractDocxText(file) {
+  const zip = await JSZip.loadAsync(file);
+  const entry = zip.file("word/document.xml");
+  if (!entry) throw new Error("not a valid .docx file");
+  const xml = new DOMParser().parseFromString(await entry.async("string"), "application/xml");
+  const lines = [];
+  Array.from(xml.getElementsByTagName("w:p")).forEach(p => {
+    let line = "";
+    Array.from(p.getElementsByTagName("*")).forEach(n => {
+      if (n.localName === "t") line += n.textContent;
+      else if (n.localName === "tab") line += "\t";
+      else if (n.localName === "br") line += "\n";
+    });
+    lines.push(line);
+  });
+  return lines.join("\n");
+}
+
+async function extractDocumentText(file) {
+  const ext = file.name.includes(".") ? file.name.toLowerCase().split(".").pop() : "";
+  if (ext === "pdf") return extractPdfText(file);
+  if (ext === "docx") return extractDocxText(file);
+  if (ext === "txt" || ext === "md" || ext === "markdown") return file.text();
+  if (ext === "doc") throw new Error("legacy .doc isn't supported — save it as .docx or PDF");
+  throw new Error("unsupported file type");
+}
+
+function combinedProjectDocText() {
+  const text = projectDocs.filter(d => d.status !== "failed")
+    .map(d => `=== Document: ${d.name} ===\n${d.text}`).join("\n\n");
+  return text.length > DOC_MAX_TOTAL_CHARS ? text.slice(0, DOC_MAX_TOTAL_CHARS) + "\n...[truncated - combined documents exceeded the size limit]" : text;
+}
+
+function renderProjectDocs() {
+  const el = document.getElementById("docFilesList");
+  el.innerHTML = "";
+  projectDocs.forEach(d => {
+    const chip = document.createElement("div");
+    chip.className = "uploaded-file-chip";
+    chip.title = d.note || "";
+    const kb = d.status === "failed" ? "" : ` · ${(d.text.length / 1000).toFixed(1)}k chars`;
+    const label = d.status === "failed" ? "Failed" : d.status === "truncated" ? "Truncated" : "Read";
+    chip.innerHTML = `<span class="badge ${d.status === "ok" ? "iac" : d.status === "truncated" ? "pipeline" : "skipped"}">${label}</span><span>${escapeHtml(d.name)}${kb}</span>`;
+    if (d.status === "failed") chip.appendChild(Object.assign(document.createElement("span"), { textContent: " — " + d.note }));
+    el.appendChild(chip);
+  });
+  document.getElementById("clearDocsBtn").style.display = projectDocs.length ? "inline-block" : "none";
+}
+
+async function handleProjectDocFiles(fileList) {
+  for (const file of Array.from(fileList || [])) {
+    try {
+      let text = (await extractDocumentText(file)).replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+      if (!text) { projectDocs.push({ name: file.name, text: "", status: "failed", note: "no readable text found (scanned or image-only?)" }); continue; }
+      const truncated = text.length > DOC_MAX_TOTAL_CHARS;
+      if (truncated) text = text.slice(0, DOC_MAX_TOTAL_CHARS);
+      projectDocs.push({ name: file.name, text, status: truncated ? "truncated" : "ok", note: truncated ? "document was very long; only the first part is used" : "" });
+    } catch (e) {
+      projectDocs.push({ name: file.name, text: "", status: "failed", note: (e && e.message) || "could not read file" });
+    }
+  }
+  renderProjectDocs();
+}
+
+function initDocZone() {
+  const zone = document.getElementById("docZone");
+  const input = document.getElementById("docUploadInput");
+  document.getElementById("docBtn").addEventListener("click", () => input.click());
+  input.addEventListener("change", async (e) => { await handleProjectDocFiles(e.target.files); input.value = ""; });
+  document.getElementById("clearDocsBtn").addEventListener("click", () => { projectDocs = []; renderProjectDocs(); });
+  ["dragover", "dragenter"].forEach(evt => zone.addEventListener(evt, (e) => { e.preventDefault(); zone.classList.add("dragover"); }));
+  ["dragleave", "dragend"].forEach(evt => zone.addEventListener(evt, () => zone.classList.remove("dragover")));
+  zone.addEventListener("drop", async (e) => { e.preventDefault(); zone.classList.remove("dragover"); await handleProjectDocFiles(e.dataTransfer.files); });
+}
+
+function renderProjectUnderstanding(u) {
+  const section = document.getElementById("understandingSection");
+  if (!u || typeof u !== "object") { section.style.display = "none"; return; }
+  const arr = (v) => (Array.isArray(v) ? v : []).map(x => String(x)).filter(Boolean);
+  const list = (title, items, cls) => `<div class="und-card${cls ? " " + cls : ""}"><h5>${title}</h5>${items.length ? `<ul>${items.map(i => `<li>${escapeHtml(i)}</li>`).join("")}</ul>` : `<div class="und-none">None stated</div>`}</div>`;
+  document.getElementById("understandingBox").innerHTML = `
+    <div class="explain-text">${escapeHtml(u.summary || "")}</div>
+    <div class="und-grid">
+      ${list("In scope", arr(u.in_scope))}
+      ${list("Out of scope", arr(u.out_of_scope))}
+      ${list("Requirements found", arr(u.requirements))}
+      ${list("Assumptions made", arr(u.assumptions))}
+      <div class="und-card"><h5>Stack &amp; environments</h5><p>${escapeHtml(u.stack_and_environments || "")}</p></div>
+      ${list("Open questions to confirm", arr(u.open_questions), "warn")}
+    </div>`;
+  section.style.display = "block";
 }
 
 function hideError() { const e = document.getElementById("errorBox"); e.classList.remove("show"); e.textContent = ""; }
@@ -764,6 +995,214 @@ function renderCodeTabs(files) {
   });
 }
 
+// --- Executive dashboard (rendered from result.dashboard after a review) ---
+
+const DASH_SEV_ORDER = ["Critical", "High", "Medium", "Low"];
+const DASH_SEV_PILL = { Critical: "p-crit", High: "p-high", Medium: "p-med", Low: "p-low" };
+const DASH_RAG_PILL = { Green: "p-green", Amber: "p-amber", Red: "p-red" };
+const DASH_RAG_COLOR = { Green: "#107C41", Amber: "#E8A33D", Red: "#C42B1C" };
+
+function dashRag(score) { return score >= 80 ? "Green" : score >= 60 ? "Amber" : "Red"; }
+
+// The model output is untrusted shape-wise: coerce everything before rendering.
+function dashInt(v, min, max) {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Math.round(Number(v));
+  return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : null;
+}
+
+function normalizeDashboard(d) {
+  if (!d || typeof d !== "object") return null;
+  const list = (v) => Array.isArray(v) ? v : [];
+  const areas = list(d.areas)
+    .map(a => ({ name: String((a && a.name) || ""), score: a ? dashInt(a.score, 0, 100) : null, insight: String((a && a.insight) || "") }))
+    .filter(a => a.name && a.score !== null);
+  if (!areas.length) return null;
+  const issues = list(d.issues).map(i => ({
+    title: String((i && i.title) || ""),
+    why: String((i && i.why_it_matters) || ""),
+    severity: DASH_SEV_ORDER.includes(i && i.severity) ? i.severity : "Medium",
+    area: String((i && i.area) || ""),
+    location: String((i && i.location) || ""),
+    likelihood: dashInt(i && i.likelihood, 1, 5) || 3,
+    impact: dashInt(i && i.impact, 1, 5) || 3,
+  })).filter(i => i.title);
+  const rag3 = v => (v === "G" || v === "A" || v === "R") ? v : null;
+  const envs = list(d.environment_readiness).map(e => ({
+    environment: String((e && e.environment) || ""),
+    cells: ["security", "reliability", "operations", "cost", "compliance"].map(k => rag3(e && e[k])),
+  })).filter(e => e.environment && e.cells.every(Boolean));
+  return {
+    bottomLine: String(d.bottom_line || ""),
+    areas, issues, envs,
+    priorities: list(d.priorities).slice(0, 3).map(p => ({
+      horizon: String((p && p.horizon) || ""), title: String((p && p.title) || ""),
+      action: String((p && p.action) || ""), result: String((p && p.expected_result) || ""),
+    })).filter(p => p.title),
+    decisions: list(d.decisions).slice(0, 3).map(x => ({ title: String((x && x.title) || ""), detail: String((x && x.detail) || "") })).filter(x => x.title),
+  };
+}
+
+function uploadCoverageSummary() {
+  const rows = [];
+  if (uploadedIacFiles.length) rows.push(["Infrastructure code files", uploadedIacFiles.length]);
+  if (uploadedPipelineFiles.length) rows.push(["Pipeline files", uploadedPipelineFiles.length]);
+  if (skippedUploadFiles.length) rows.push(["Skipped (secrets, binaries, other)", skippedUploadFiles.length]);
+  if (!rows.length) {
+    const pasted = (document.getElementById("existingIacInput").value.trim() ? 1 : 0) + (document.getElementById("existingPipelineInput").value.trim() ? 1 : 0);
+    rows.push(["Pasted code sections", pasted]);
+  }
+  return rows;
+}
+
+// Saves the rendered dashboard as one self-contained HTML file (styles inlined,
+// no scripts or external requests) so it can be emailed or opened offline.
+function downloadDashboardReport() {
+  const el = document.getElementById("execDash");
+  if (!el || !el.classList.contains("show")) return;
+  const clone = el.cloneNode(true);
+  clone.querySelectorAll(".export-actions").forEach(n => n.remove());
+  const css = Array.from(document.querySelectorAll("style")).map(s => s.textContent).join("\n");
+  const date = new Date().toISOString().slice(0, 10);
+  const html = `<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Project Health Report - ${date}</title>
+<style>${css}</style></head>
+<body><div class="wrap">${clone.outerHTML}</div></body></html>`;
+  triggerDownload(new Blob([html], { type: "text/html" }), `project-health-report-${date}.html`);
+}
+
+function renderExecDashboard(rawDash) {
+  const el = document.getElementById("execDash");
+  const d = normalizeDashboard(rawDash);
+  if (!d) { el.classList.remove("show"); el.innerHTML = ""; return; }
+
+  const e = escapeHtml;
+  const overall = Math.round(d.areas.reduce((s, a) => s + a.score, 0) / d.areas.length);
+  const rag = dashRag(overall);
+  const ragStyle = { Green: "background:#DFF3E4;color:#0B5A2E", Amber: "background:#FCEBCB;color:#7A4A00", Red: "background:#FADBD7;color:#8A1C12" }[rag];
+  const ragLabel = { Green: "GREEN · HEALTHY", Amber: "AMBER · ON WATCH", Red: "RED · ACTION NEEDED" }[rag];
+  const sorted = [...d.areas].sort((a, b) => b.score - a.score);
+  const best = sorted[0], worst = sorted[sorted.length - 1];
+
+  const sevCount = Object.fromEntries(DASH_SEV_ORDER.map(s => [s, d.issues.filter(i => i.severity === s).length]));
+  const issuesSorted = [...d.issues].sort((a, b) =>
+    DASH_SEV_ORDER.indexOf(a.severity) - DASH_SEV_ORDER.indexOf(b.severity) || (b.likelihood * b.impact) - (a.likelihood * a.impact));
+
+  // Heat map: likelihood (rows, 5 at top) x impact (cols); coloured by L*I like a standard risk matrix.
+  let heat = "";
+  const cellBand = { crit: 0, high: 0, med: 0, low: 0 };
+  for (let L = 5; L >= 1; L--) for (let I = 1; I <= 5; I++) {
+    const sc = L * I, c = d.issues.filter(i => i.likelihood === L && i.impact === I).length;
+    let bg, fg, band;
+    if (sc >= 20) { bg = "#C42B1C"; fg = "#FFFFFF"; band = "crit"; }
+    else if (sc >= 12) { bg = "#F4A259"; fg = "#4A2600"; band = "high"; }
+    else if (sc >= 6) { bg = "#F8DE7E"; fg = "#4A3B00"; band = "med"; }
+    else { bg = "#CFE8D6"; fg = "#0B4A26"; band = "low"; }
+    cellBand[band] += c;
+    heat += `<div style="background:${bg};color:${fg}${c ? "" : ";opacity:.55"}" title="Likelihood ${L}, impact ${I}${c ? ": " + c + " issues" : ""}">${c || ""}</div>`;
+  }
+
+  const gaugeDash = (overall / 100 * 490.09).toFixed(1);
+  const areaCards = d.areas.map(a => {
+    const r = dashRag(a.score);
+    return `<div class="card area"><div class="spread" style="align-items:center"><span style="font-weight:600">${e(a.name)}</span><span class="pill ${DASH_RAG_PILL[r]}">${r}</span></div>
+      <span class="s">${a.score}</span><span class="ins">${e(a.insight)}</span><span style="font-size:11.5px;color:var(--muted)">Source: code review</span></div>`;
+  }).join("");
+
+  const bars = d.areas.map(a => `<div class="barrow"><span style="font-size:12.5px;color:#3B4552;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${e(a.name)}">${e(a.name)}</span><div class="track"><div class="f" style="width:${a.score}%;background:${DASH_RAG_COLOR[dashRag(a.score)]}"></div><div class="tgt"></div></div><span style="font-size:12.5px;font-weight:600;text-align:right">${a.score}</span></div>`).join("");
+
+  const shown = issuesSorted.slice(0, 10);
+  const issueRows = shown.map(i => `<tr><td style="font-weight:500;max-width:240px">${e(i.title)}</td><td style="color:#3B4552;max-width:240px">${e(i.why)}</td><td><span class="pill ${DASH_SEV_PILL[i.severity]}">${i.severity}</span></td><td style="color:#3B4552">${e(i.area)}</td><td style="color:#3B4552;font-family:var(--mono);font-size:12px;word-break:break-all">${e(i.location)}</td></tr>`).join("");
+
+  const prioColors = ["#C42B1C", "#A35F00", "#1F6FB2"];
+  const prios = d.priorities.map((p, idx) => `<div class="prio"><span class="n" style="background:${prioColors[idx]}">${idx + 1}</span><div style="display:flex;flex-direction:column;gap:4px"><span style="font-size:12px;font-weight:700;letter-spacing:.05em;color:${prioColors[idx]}">${e(p.horizon.toUpperCase())}</span><span style="font-weight:600">${e(p.title)}</span><span style="font-size:13px;color:#3B4552">${e(p.action)}</span><span class="small muted">Expected result: ${e(p.result)}</span></div></div>`).join("");
+
+  const CELL = { G: "background:#DFF3E4;color:#0B5A2E", A: "background:#FCEBCB;color:#7A4A00", R: "background:#C42B1C;color:#FFFFFF" };
+  const envGrid = d.envs.length
+    ? `<div class="envgrid"><div></div>${["Security", "Reliability", "Operations", "Cost", "Compliance"].map(h => `<div class="ch">${h}</div>`).join("")}${d.envs.map(r => `<div class="rh">${e(r.environment)}</div>` + r.cells.map(c => `<div style="${CELL[c]}">${c}</div>`).join("")).join("")}</div>`
+    : "";
+
+  const decisions = d.decisions.length
+    ? `<section class="decide" style="flex:1 1 300px"><span class="h">Decisions needed from leadership</span>${d.decisions.map((x, idx) => `<div class="item"><span style="font-weight:600">${idx + 1}. ${e(x.title)}</span><span style="font-size:13px;color:#C9D6E3">${e(x.detail)}</span></div>`).join("")}</section>`
+    : "";
+
+  const coverage = uploadCoverageSummary().map(([k, v]) => `<div class="cov"><span>${e(k)}</span><span style="font-weight:600">${v}</span></div>`).join("");
+  const today = new Date().toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+
+  el.innerHTML = `
+    <div class="tool">
+      <div><div class="tool-title">Project Health Dashboard</div><div class="muted" style="font-size:12.5px">Built from this code review · ${e(today)}</div></div>
+      <div class="export-actions" style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="export-btn" type="button" onclick="downloadDashboardReport()">Download report</button>
+        <button class="export-btn secondary" type="button" onclick="window.print()">Print / Save as PDF</button>
+      </div>
+    </div>
+
+    <div class="row" style="align-items:stretch">
+      <section class="card" style="flex:1 1 280px;padding:20px;display:flex;flex-direction:column;align-items:center;gap:10px">
+        <span class="h" style="align-self:flex-start">Overall code health</span>
+        <div class="gauge">
+          <svg width="190" height="190" viewBox="0 0 190 190"><circle cx="95" cy="95" r="78" fill="none" stroke="#EDEBE9" stroke-width="16"/><circle cx="95" cy="95" r="78" fill="none" stroke="${DASH_RAG_COLOR[rag]}" stroke-width="16" stroke-linecap="round" stroke-dasharray="${gaugeDash} 490.09" transform="rotate(-90 95 95)"/></svg>
+          <div class="c"><span class="big">${overall}</span><span class="muted" style="font-size:13px">out of 100</span></div>
+        </div>
+        <span class="ragpill" style="${ragStyle}">${ragLabel}</span>
+        <span class="small muted" style="text-align:center">Average of ${d.areas.length} assessed areas · best-practice target: 80</span>
+      </section>
+
+      <section class="card" style="flex:2 1 460px;padding:20px 24px;display:flex;flex-direction:column;gap:14px">
+        <span class="h">Bottom line</span>
+        <p style="margin:0;font-size:16px;line-height:1.5">${e(d.bottomLine)}</p>
+        <div class="grid-auto" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
+          <div class="mini"><span class="small muted">Strongest area</span><span style="font-weight:600">${e(best.name)} · ${best.score}</span></div>
+          <div class="mini"><span class="small muted">Weakest area</span><span style="font-weight:600">${e(worst.name)} · ${worst.score}</span></div>
+        </div>
+      </section>
+      ${decisions}
+    </div>
+
+    <div class="grid-auto facts">
+      <div class="card fact"><span class="small muted">Critical issues</span><span class="v" style="color:#C42B1C">${sevCount.Critical}</span></div>
+      <div class="card fact"><span class="small muted">High issues</span><span class="v" style="color:#A35F00">${sevCount.High}</span></div>
+      <div class="card fact"><span class="small muted">Medium / low issues</span><span class="v">${sevCount.Medium + sevCount.Low}</span></div>
+      <div class="card fact"><span class="small muted">Areas needing action (Red)</span><span class="v" style="color:${d.areas.some(a => a.score < 60) ? "#C42B1C" : "#107C41"}">${d.areas.filter(a => a.score < 60).length}</span></div>
+    </div>
+
+    <div class="spread"><span style="font-weight:600;font-size:16px">Health by area</span><span class="small muted">Scores 0–100, higher is better · Green ≥ 80 · Amber 60–79 · Red &lt; 60</span></div>
+    <div class="grid-auto areas">${areaCards}</div>
+
+    <div class="row" style="gap:12px">
+      <section class="card xpanel" style="flex:1 1 360px">
+        <span class="h">Risk map · ${d.issues.length} issues</span>
+        <div class="heatwrap"><div style="display:flex;align-items:center;justify-content:center;width:18px"><span style="transform:rotate(-90deg);font-size:11px;color:var(--muted);white-space:nowrap">Likelihood →</span></div><div class="heat">${heat}</div></div>
+        <div style="padding-left:26px;font-size:11px;color:var(--muted);text-align:center">Business impact →</div>
+        <div class="legend"><span><span class="sw" style="background:#C42B1C"></span>Critical ${cellBand.crit}</span><span><span class="sw" style="background:#F4A259"></span>High ${cellBand.high}</span><span><span class="sw" style="background:#F8DE7E"></span>Medium ${cellBand.med}</span><span><span class="sw" style="background:#CFE8D6"></span>Low ${cellBand.low}</span></div>
+      </section>
+      <section class="card xpanel" style="flex:1 1 360px">
+        <div class="spread"><span class="h">Score vs target</span><span class="small muted">Target 80</span></div>
+        <div style="display:flex;flex-direction:column;gap:9px">${bars}</div>
+      </section>
+    </div>
+
+    <div class="row" style="gap:12px;align-items:flex-start">
+      <section class="card xpanel" style="flex:3 1 560px">
+        <div class="spread"><span class="h">Top issues needing attention</span><span class="small muted">${shown.length} of ${d.issues.length} · ranked by severity</span></div>
+        <div style="overflow-x:auto"><table class="issues"><thead><tr><th>Issue</th><th>Why it matters</th><th>Severity</th><th>Area</th><th>Where</th></tr></thead><tbody>${issueRows}</tbody></table></div>
+      </section>
+      ${prios ? `<section class="card xpanel" style="flex:1 1 300px;gap:14px"><span class="h">Management priorities</span><div style="display:flex;flex-direction:column;gap:14px">${prios}</div></section>` : ""}
+    </div>
+
+    <div class="row" style="gap:12px;align-items:stretch">
+      ${envGrid ? `<section class="card xpanel" style="flex:3 1 560px;gap:12px"><div class="spread"><span class="h">Readiness by environment</span><span class="small muted">G = on track · A = needs attention · R = action required</span></div><div style="overflow-x:auto">${envGrid}</div></section>` : ""}
+      <section class="card xpanel" style="flex:1 1 300px">
+        <span class="h">What this review covered</span>
+        <div>${coverage}</div>
+        <span style="font-size:12.5px;color:#3B4552">Scores are an AI assessment of the code provided only. Budget, schedule, live monitoring and audit evidence are not visible to this review.</span>
+      </section>
+    </div>`;
+  el.classList.add("show");
+}
+
 function renderResults(result, mode) {
   currentResult = result;
   currentMode = mode;
@@ -792,6 +1231,7 @@ function renderResults(result, mode) {
   `;
 
   document.getElementById("explainBox").textContent = result.explanation || "";
+  renderProjectUnderstanding(mode === "solution" ? result.project_understanding : null);
 
   const issuesSection = document.getElementById("issuesSection");
   const issuesList = document.getElementById("issuesList");
@@ -817,6 +1257,8 @@ function renderResults(result, mode) {
   }
 
   renderCodeTabs(files);
+  // The executive dashboard is only produced by a review of existing code.
+  renderExecDashboard(mode === "existing" ? result.dashboard : null);
 }
 
 function setGeneratingUi(isGenerating, statusText) {
@@ -849,10 +1291,12 @@ async function runGenerate() {
     payload.request = context;
   } else {
     const req = document.getElementById("solutionPromptInput").value.trim();
-    if (!req) { showError("Describe the solution you need first."); return; }
+    const projectDocument = combinedProjectDocText();
+    if (!req && !projectDocument) { showError("Describe the solution you need, or upload a project document."); return; }
     if (checkedEnvs.size === 0) { showError("Pick at least one environment."); return; }
     payload.request = req;
     payload.environments = Array.from(checkedEnvs);
+    if (projectDocument) payload.projectDocument = projectDocument;
   }
 
   const controller = new AbortController();
@@ -894,12 +1338,25 @@ function stopGenerate() {
   if (currentAbortController) currentAbortController.abort();
 }
 
+async function loadCurrentUser() {
+  try {
+    const res = await fetch("/api/me");
+    if (!res.ok) return;
+    const me = await res.json();
+    const bar = document.getElementById("userBar");
+    bar.innerHTML = `<span>Signed in as <strong>${escapeHtml(me.name)}</strong></span><span class="role${me.isAdmin ? " admin" : ""}">${me.isAdmin ? "ADMIN" : "USER"}</span>${me.logoutUrl ? `<a href="${escapeHtml(me.logoutUrl)}">Sign out</a>` : ""}`;
+    bar.classList.add("show");
+  } catch (e) { /* the bar is a convenience; the app works without it */ }
+}
+
 function init() {
+  loadCurrentUser();
   renderAllChoiceRows();
   renderExamples();
   renderEnvChecks();
   renderSolutionExamples();
   initUploadZone();
+  initDocZone();
   document.getElementById("genBtn").addEventListener("click", runGenerate);
   document.getElementById("stopBtn").addEventListener("click", stopGenerate);
   document.getElementById("downloadBtn").addEventListener("click", downloadBundle);
