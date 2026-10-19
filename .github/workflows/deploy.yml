@@ -4,10 +4,14 @@ name: Deploy to Azure Container Apps
 # to ACR tagged with the commit SHA, point the Container App at it, and fail the
 # run if the new revision doesn't become ready.
 #
-# Requires these repository secrets (see scripts/setup-azure-oidc.sh for how
-# an Azure AD admin provisions the identity behind the first three):
-#   AZURE_CLIENT_ID, AZURE_SUBSCRIPTION_ID
-#   ADMIN_EMAILS  comma-separated sign-in emails of the app's admins
+# Required repository secrets:
+#   AZURE_CLIENT_ID        app registration (client) ID of ai-pipeline-generator-github-deploy
+#   AZURE_SUBSCRIPTION_ID  target subscription
+#   ADMIN_EMAILS           comma-separated sign-in emails of the app's admins (optional)
+#
+# Required Azure RBAC for the app registration's service principal:
+#   AcrPush     on the registry experionaitoolacr
+#   Contributor on the resource group rg-ai-devops-tool (or scoped to the Container App)
 #
 # ANTHROPIC_API_KEY stays as a Container App secret and is not touched here.
 on:
@@ -25,6 +29,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
+  AZURE_TENANT_ID: 48d461c7-ee5c-46eb-8d77-cb2b2b2dfdba
   REGISTRY: experionaitoolacr.azurecr.io
   REGISTRY_NAME: experionaitoolacr
   IMAGE_NAME: ai-pipeline-generator
@@ -34,6 +39,7 @@ env:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -47,6 +53,8 @@ jobs:
         run: |
           node --check server/index.js
           AUTH_MODE=basic AUTH_USERNAME=ci AUTH_PASSWORD=ci PORT=8099 node server/index.js &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
           sleep 3
           curl -fsS http://localhost:8099/api/health
           echo
@@ -56,15 +64,26 @@ jobs:
   build-and-deploy:
     needs: test
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # Prints the exact OIDC subject GitHub is sending. The federated credential's
+      # "Subject identifier" in Entra ID must match this string character for character.
+      - name: Show OIDC subject claim
+        run: |
+          TOKEN=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange" | jq -r .value)
+          PAYLOAD=$(echo "$TOKEN" | cut -d. -f2 | tr '_-' '/+')
+          while [ $(( ${#PAYLOAD} % 4 )) -ne 0 ]; do PAYLOAD="${PAYLOAD}="; done
+          echo "$PAYLOAD" | base64 -d | jq -r '"sub: \(.sub)\naud: \(.aud)\niss: \(.iss)"'
 
       - name: Azure login (OIDC)
         uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: '48d461c7-ee5c-46eb-8d77-cb2b2b2dfdba'
+          tenant-id: ${{ env.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Log in to Azure Container Registry
@@ -83,14 +102,13 @@ jobs:
           ADMIN_EMAILS: ${{ secrets.ADMIN_EMAILS }}
         run: |
           # AUTH_MODE=entra: sign-in is handled by the app's built-in Microsoft Entra
-          # authentication. ADMIN_EMAILS is only changed when the variable is set.
+          # authentication. ADMIN_EMAILS is only changed when the secret is set.
           ENV_VARS=("AUTH_MODE=entra")
           if [ -n "$ADMIN_EMAILS" ]; then
             ENV_VARS+=("ADMIN_EMAILS=$ADMIN_EMAILS")
           else
             echo "::warning::Repository secret ADMIN_EMAILS is not set - admin emails on the app are left unchanged."
           fi
-
           REVISION=$(az containerapp update \
             --name ${{ env.CONTAINER_APP_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
@@ -124,4 +142,4 @@ jobs:
 
       - name: Azure logout
         if: always()
-        run: az logout
+        run: az logout || true
