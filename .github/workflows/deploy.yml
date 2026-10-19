@@ -6,7 +6,7 @@ name: Deploy to Azure Container Apps
 #
 # Requires these repository secrets (see scripts/setup-azure-oidc.sh for how
 # an Azure AD admin provisions the identity behind the first three):
-#   AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID
+#   AZURE_CLIENT_ID, AZURE_SUBSCRIPTION_ID
 #   ADMIN_EMAILS  comma-separated sign-in emails of the app's admins
 #
 # ANTHROPIC_API_KEY stays as a Container App secret and is not touched here.
