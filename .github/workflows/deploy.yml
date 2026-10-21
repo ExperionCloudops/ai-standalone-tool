@@ -29,7 +29,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  AZURE_TENANT_ID: 48d461c7-ee5c-46eb-8d77-cb2b2b2dfdba
+  AZURE_TENANT_ID: 488461c7-ee5c-48eb-8d77-c02b2b2dfdba
   REGISTRY: experionaitoolacr.azurecr.io
   REGISTRY_NAME: experionaitoolacr
   IMAGE_NAME: ai-pipeline-generator

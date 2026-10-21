@@ -10,14 +10,14 @@
 # What it creates, all scoped to this one repo/branch and least-privilege:
 #   - App registration + service principal: ai-pipeline-generator-github-deploy
 #   - Federated credential trusting GitHub OIDC tokens from
-#     jay-panick0012/ai-standalone-tool on the main branch only
+#     ExperionCloudops/ai-standalone-tool on the main branch only
 #   - AcrPush on the container registry (push images, nothing else)
 #   - Contributor on just the ai-pipeline-generator Container App resource
 #     (not the whole resource group)
 set -euo pipefail
 
 APP_NAME="ai-pipeline-generator-github-deploy"
-REPO="jay-panick0012/ai-standalone-tool"
+REPO="ExperionCloudops/ai-standalone-tool"
 BRANCH="main"
 SUBSCRIPTION_ID="09fd34f3-62c0-41a6-aa81-dbf429305626"
 RESOURCE_GROUP="rg-ai-devops-tool"
